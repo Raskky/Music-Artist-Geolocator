@@ -1,0 +1,95 @@
+body {
+    margin: 0;
+    padding: 0;
+}
+
+ul {
+    text-align: center;
+    padding-left: 0;
+}
+
+#map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+}
+
+#map canvas {
+    cursor: crosshair;
+}
+
+#info {
+    display: block;
+    position: absolute;
+    top: 10px;
+    left: 15%;
+    transform: translate(-50%);
+    width: 20%;
+    padding: 10px;
+    border: none;
+    border-radius: 12px;
+    font-size: 12px;
+    text-align: center;
+    color: #fff;
+    background: #222;
+}
+
+#origin {
+    display: none;
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translate(-50%);
+    width: 10%;
+    overflow: auto;
+    text-align: center;
+    text-wrap: wrap;
+    font-weight: bold;
+    padding: 10px;
+    font-size: 18px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.8);
+}
+
+#artists {
+    display: none;
+    position: absolute;
+    right: 30px;
+    bottom: 30px;
+    width: 15%;
+    height: 30%;
+    overflow: auto;
+    border-radius: 8px;
+    margin-top: 0;
+    padding: 10px;
+    text-align: center;
+    text-wrap: wrap;
+    font-size: 16px;
+    background: rgb(255, 255, 255, 0.8);
+}
+
+#geocoder-container {
+    display: flex;
+    text-align: center;
+    align-items: center;
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    padding: 10px;
+}
+
+#select-search-options {
+    background: whitesmoke;
+    border-radius: 8px;
+    margin: 2px;
+    padding: 7px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.maplibregl-ctrl-geocoder--result-address {
+    text-align: center;
+    text-wrap: wrap;
+    text-overflow: ellipsis;
+}
