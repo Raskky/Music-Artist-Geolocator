@@ -19,7 +19,7 @@ const map = new maplibregl.Map({
 
 const geocoderApi = {
   forwardGeocode: async (config) => {
-    let locationToGeocode = "";
+    let location = "";
     const features = [];
     const searchOptions = document.getElementById("select-search-options");
     if (searchOptions.value === "artist") {
@@ -34,51 +34,52 @@ const geocoderApi = {
           (artist) => artist.name.toLowerCase() == config.query.toLowerCase(),
         )["country"];
         if (typeof mbApiResultCountry !== "undefined") {
-          locationToGeocode = `${mbApiResultCity}, ${mbApiResultCountry}`;
-        } else locationToGeocode = mbApiResultCity;
+          location = `${mbApiResultCity}, ${mbApiResultCountry}`;
+        } else location = mbApiResultCity;
         const origin = document.getElementById("origin");
         origin.setAttribute("style", "display: block;");
-        origin.innerHTML = locationToGeocode;
+        origin.innerHTML = location;
       } catch (error) {
         console.error("Error parsing artist's properties\n", error);
       }
     }
     if (searchOptions.value === "area") {
-      locationToGeocode = config.query;
-    }
-
-    try {
-      const request = `https://nominatim.openstreetmap.org/search?q=${
-        locationToGeocode
-      }&format=geojson&polygon_geojson=1&addressdetails=1`;
-      const response = await fetch(request);
-      const geojson = await response.json();
-      for (const feature of geojson.features) {
-        const center = [
-          feature.bbox[0] + (feature.bbox[2] - feature.bbox[0]) / 2,
-          feature.bbox[1] + (feature.bbox[3] - feature.bbox[1]) / 2,
-        ];
-        const point = {
-          type: "Feature",
-          geometry: {
-            type: "Point",
-            coordinates: center,
-          },
-          place_name: feature.properties.display_name,
-          country_code: feature.properties.address.country_code,
-          properties: feature.properties,
-          text: feature.properties.display_name,
-          place_type: ["place"],
-          center,
-        };
-        features.push(point);
+      location = config.query;
+      try {
+        const request = `https://nominatim.openstreetmap.org/search?q=${
+          location
+        }&format=geojson&polygon_geojson=1&addressdetails=1`;
+        const response = await fetch(request);
+        const geojson = await response.json();
+        for (const feature of geojson.features) {
+          const center = [
+            feature.bbox[0] + (feature.bbox[2] - feature.bbox[0]) / 2,
+            feature.bbox[1] + (feature.bbox[3] - feature.bbox[1]) / 2,
+          ];
+          const point = {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: center,
+            },
+            place_name: feature.properties.display_name,
+            country_code: feature.properties.address.country_code,
+            city: feature.properties.address.city,
+            properties: feature.properties,
+            text: feature.properties.display_name,
+            place_type: ["place"],
+            center,
+          };
+          features.push(point);
+        }
+        console.log(features);
+      } catch (e) {
+        console.error(`Failed to forwardGeocode with error: ${e}`);
       }
-    } catch (e) {
-      console.error(`Failed to forwardGeocode with error: ${e}`);
+      return {
+        features,
+      };
     }
-    return {
-      features,
-    };
   },
 };
 
@@ -101,6 +102,12 @@ selectSearchOptions.id = "select-search-options";
 selectSearchOptions.options.add(artistOption);
 selectSearchOptions.options.add(areaOption);
 geocoderContainer.appendChild(selectSearchOptions);
+
+geocoder.on("result", (e) => {
+  clearResult();
+  console.log(e.result);
+  searchAndDisplayArtists(e.result.city, e.result.country_code);
+});
 
 map.on("mousemove", (e) => {
   try {
@@ -133,7 +140,7 @@ map.on("click", async (e) => {
         city = dataOnClick.features[0].properties.address.town;
       }
       const countryCode =
-        dataOnClick.features[0].properties.address.country_code.toUpperCase();
+        dataOnClick.features[0].properties.address.country_code;
       console.log(city, countryCode);
       searchAndDisplayArtists(city, countryCode);
     }
@@ -143,16 +150,16 @@ map.on("click", async (e) => {
 });
 
 async function searchAndDisplayArtists(city, countryCode) {
+  countryCode = countryCode.toUpperCase();
   const origin = document.getElementById("origin");
   const artistList = document.getElementById("artists");
-  origin.innerHTML = "";
-  artistList.innerHTML = "";
   try {
     const result = await mbApi.search("artist", {
       query: `beginarea:"${city}" AND country:${countryCode}`,
       limit: 100,
     });
     const artists = result.artists;
+    console.log("This should return some artists");
     console.log(artists);
     const artistNames = artists.map((artist) => artist.name);
     const n = 10;
