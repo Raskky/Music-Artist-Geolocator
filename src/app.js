@@ -72,7 +72,7 @@ const geocoderApi = {
           };
           features.push(point);
         }
-        console.log(features);
+        //console.log(features);
       } catch (e) {
         console.error(`Failed to forwardGeocode with error: ${e}`);
       }
@@ -105,7 +105,7 @@ geocoderContainer.appendChild(selectSearchOptions);
 
 geocoder.on("result", (e) => {
   clearResult();
-  console.log(e.result);
+  //console.log(e.result);
   searchAndDisplayArtists(e.result.city, e.result.country_code);
 });
 
@@ -124,43 +124,43 @@ map.on("click", async (e) => {
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${e.lngLat.lat}&lon=${e.lngLat.lng}&format=geojson&polygon_geojson=1&addressdetails=1`,
     );
-    const dataOnClick = await response.json();
-    console.log(dataOnClick);
-
-    if (
-      dataOnClick.features &&
-      dataOnClick.features.length > 0 &&
-      (dataOnClick.features[0].properties.address.city ||
-        dataOnClick.features[0].properties.address.town)
-    ) {
-      let city = "";
-      if (dataOnClick.features[0].properties.address.city) {
-        city = dataOnClick.features[0].properties.address.city;
-      } else {
-        city = dataOnClick.features[0].properties.address.town;
-      }
-      const countryCode =
-        dataOnClick.features[0].properties.address.country_code;
-      console.log(city, countryCode);
-      searchAndDisplayArtists(city, countryCode);
+    const data = await response.json();
+    if (data.features) {
+      searchAndDisplayArtists(data.features[0]);
     }
   } catch (error) {
     console.error("Error reverse geocoding coordinates", error);
+    return [];
   }
 });
 
-async function searchAndDisplayArtists(city, countryCode) {
-  countryCode = countryCode.toUpperCase();
+async function searchAndDisplayArtists(feature) {
+  console.log(feature);
+  const countryCode = feature.properties.address["country_code"].toUpperCase();
+  let city = "";
+  if (feature.properties.address.city) {
+    city = feature.properties.address.city;
+  } else city = feature.properties.address.town;
   const origin = document.getElementById("origin");
   const artistList = document.getElementById("artists");
+  let areaOnClick = [];
   try {
-    const result = await mbApi.search("artist", {
-      query: `beginarea:"${city}" AND country:${countryCode}`,
+    const area_response = await mbApi.search("area", {
+      query: `iso:"${feature.properties.address["ISO3166-2-lvl4"]}" AND area:"${city}"`,
+    });
+    areaOnClick = area_response.areas[0];
+  } catch (error) {
+    console.error("Error fetching area: ", error);
+    return [];
+  }
+
+  try {
+    const artist_response = await mbApi.browse("artist", {
+      area: areaOnClick.id,
       limit: 100,
     });
-    const artists = result.artists;
-    console.log("This should return some artists");
-    console.log(artists);
+    const artists = artist_response.artists;
+    //console.log(artist_response);
     const artistNames = artists.map((artist) => artist.name);
     const n = 10;
     const randomArtists = getRandomArtists(artistNames, n);
@@ -182,7 +182,7 @@ async function searchAndDisplayArtists(city, countryCode) {
       clearResult();
     }
   } catch (error) {
-    console.error("Error searching artists: ", error);
+    console.error("Error fetching artists: ", error);
     return [];
   }
 }
