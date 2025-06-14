@@ -1,10 +1,12 @@
 import maplibregl from "maplibre-gl";
 import { MusicBrainzApi } from "musicbrainz-api";
+//import MaplibreGeocoder from "@maplibre/maplibre-gl-geocoder";
 import "@maplibre/maplibre-gl-geocoder/dist/maplibre-gl-geocoder.css";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const origin = document.getElementById("origin");
 const artistList = document.getElementById("artists");
+//const searchOptions = document.getElementById("select-search-options");
 const styles = {
   dark: "https://tiles.openfreemap.org/styles/dark",
 };
@@ -20,6 +22,15 @@ const map = new maplibregl.Map({
   style: "https://tiles.openfreemap.org/styles/dark", // style URL
   center: [-123.4, 47.9], // starting position [lng, lat]
   zoom: 6, // starting zoom
+});
+
+map.on("mousemove", (e) => {
+  try {
+    document.getElementById("info").innerHTML =
+      `${JSON.stringify(e.point)}<br />${JSON.stringify(e.lngLat.wrap())}`;
+  } catch (error) {
+    console.error("Error getting coordinates under mouse cursor: ", error);
+  }
 });
 
 map.on("click", async (e) => {
