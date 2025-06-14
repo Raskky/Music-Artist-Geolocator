@@ -1,12 +1,12 @@
 import maplibregl from "maplibre-gl";
 import { MusicBrainzApi } from "musicbrainz-api";
-//import MaplibreGeocoder from "@maplibre/maplibre-gl-geocoder";
 import "@maplibre/maplibre-gl-geocoder/dist/maplibre-gl-geocoder.css";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { circle } from "@turf/turf";
 
 const origin = document.getElementById("origin");
 const artistList = document.getElementById("artists");
-//const searchOptions = document.getElementById("select-search-options");
+
 const styles = {
   dark: "https://tiles.openfreemap.org/styles/dark",
 };
@@ -34,28 +34,33 @@ map.on("mousemove", (e) => {
 });
 
 map.on("click", async (e) => {
-  console.log(e.lngLat.lng, e.lngLat.lat);
-  clearResult();
-  const location = await getLocationFromCoords(e.lngLat.lng, e.lngLat.lat);
-  const artists = await getArtistsFromArea(location.mbid);
-  console.log(artists);
-  const randomArtists = await getRandomArtists(artists, 10);
+  try {
+    console.log(map.getZoom());
+    let radius = 1;
+    clearScreen();
+    drawCircle(radius, e.lngLat.lng, e.lngLat.lat);
+    const location = await getLocationFromCoords(e.lngLat.lng, e.lngLat.lat);
+    const artists = await getArtistsFromArea(location.mbid);
+    const randomArtists = await getRandomArtists(artists, 10);
 
-  if (randomArtists && randomArtists.length > 0) {
-    origin.innerHTML = `${location.city}, ${location.country}`;
-    origin.setAttribute("style", "display: block;");
-    const p = document.createElement("p");
-    artistList.setAttribute("style", "display: block;");
-    p.innerHTML = `<b>10 Artists from ${location.city}, ${location.country}</b>`;
-    artistList.appendChild(p);
+    if (randomArtists && randomArtists.length > 0) {
+      origin.innerHTML = `${location.city}, ${location.country}`;
+      origin.setAttribute("style", "display: block;");
+      const p = document.createElement("p");
+      artistList.setAttribute("style", "display: block;");
+      p.innerHTML = `<b>10 Artists from ${location.city}, ${location.country}</b>`;
+      artistList.appendChild(p);
 
-    randomArtists.forEach((a) => {
-      const ul = document.createElement("ul");
-      ul.innerHTML = a.name;
-      artistList.appendChild(ul);
-    });
-  } else {
-    clearResult();
+      randomArtists.forEach((a) => {
+        const ul = document.createElement("ul");
+        ul.innerHTML = a.name;
+        artistList.appendChild(ul);
+      });
+    } else {
+      clearScreen();
+    }
+  } catch (error) {
+    console.error("Error handling click: ", error);
   }
 });
 
@@ -68,7 +73,7 @@ async function getLocationFromCoords(lng, lat) {
           SERVICE wikibase:around {
             ?city wdt:P625 ?coords .
             bd:serviceParam wikibase:center "POINT(${lng} ${lat})"^^geo:wktLiteral;
-                           wikibase:radius "10";
+                           wikibase:radius "5";
                            wikibase:timeout 3000.
           }
 
@@ -130,9 +135,39 @@ function getRandomArtists(artists, n) {
   }
 }
 
-function clearResult() {
+function clearScreen() {
   origin.innerHTML = "";
   origin.setAttribute("style", "display: none;");
   artistList.innerHTML = "";
   artistList.setAttribute("style", "display: none;");
+}
+
+function drawCircle(radius, lng, lat) {
+  if (map.getLayer("location-radius-outline"))
+    map.removeLayer("location-radius-outline");
+  if (map.getLayer("location-radius")) map.removeLayer("location-radius");
+  if (map.getSource("location-radius")) map.removeSource("location-radius");
+
+  let center = [lng, lat];
+  let options = { steps: 64, units: "kilometers" };
+  let result = circle(center, radius, options);
+
+  // Add the circle as a GeoJSON source
+  map.addSource("location-radius", { type: "geojson", data: result });
+
+  // Add a fill layer with some transparency
+  map.addLayer({
+    id: "location-radius",
+    type: "fill",
+    source: "location-radius",
+    paint: { "fill-color": "#8CCFFF", "fill-opacity": 0.5 },
+  });
+
+  // Add a line layer to draw the circle outline
+  map.addLayer({
+    id: "location-radius-outline",
+    type: "line",
+    source: "location-radius",
+    paint: { "line-color": "#0094ff", "line-width": 3 },
+  });
 }
