@@ -44,6 +44,10 @@ if (savedStyle && styles[savedStyle]) {
   map.setStyle(styles[savedStyle]);
 }
 
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") clearScreen();
+});
+
 mapStyleSelector.addEventListener("change", (e) => {
   const selectedStyle = e.target.value.toLowerCase();
   localStorage.setItem("mapStyle", selectedStyle);
@@ -82,6 +86,7 @@ map.on("click", async (e) => {
     clearScreen();
     drawCircle(radius, e.lngLat.lng, e.lngLat.lat);
     const location = await getLocationFromCoords(e.lngLat.lng, e.lngLat.lat);
+    console.log(location);
     const artists = await getArtistsFromArea(location.mbid);
     const randomArtists = await getRandomArtists(artists, 10);
 
@@ -107,49 +112,66 @@ map.on("click", async (e) => {
 });
 
 async function getLocationFromCoords(lng, lat) {
-  try {
-    const sparql = `
-        #pragma hint.timeout 5000
-        SELECT ?city ?cityLabel ?country ?countryLabel ?mbid WHERE {
-
-          SERVICE wikibase:around {
-            ?city wdt:P625 ?coords .
-            bd:serviceParam wikibase:center "POINT(${lng} ${lat})"^^geo:wktLiteral;
-                           wikibase:radius "5";
-                           wikibase:timeout 3000.
-          }
-
-          # Entity type filters
-          ?city wdt:P31/wdt:P279* wd:Q486972 .
-
-          # Country lookup with minimal optional paths
-          { ?city wdt:P17 ?country }
-          UNION
-          { ?city wdt:P131* ?country . ?country wdt:P31 wd:Q6256 }
-
-          # Required MBID (remove if not always needed)
-          ?city wdt:P982 ?mbid .
-
-          # Labels last
-          SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-        }
-        LIMIT 1
-      `;
-
-    const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparql)}&format=json`;
-    const response = await fetch(url);
-    const data = await response.json();
-    const result = data.results.bindings[0];
-
-    return {
-      city: result?.cityLabel?.value || "Unknown",
-      country: result?.countryLabel?.value || "Unknown",
-      mbid: result?.mbid?.value || null,
-    };
-  } catch (error) {
-    console.log("Error reverse geocoding area:", error);
-    return null;
+  let result = await tryQuery(lng, lat, 3);
+  if (!result || result.results.bindingslength === 0) {
+    result = await tryQuery(lng, lat, 50);
   }
+  const data = result?.results?.bindings[0];
+  return {
+    city: data?.cityLabel?.value || "Unknown",
+    country: data?.countryLabel?.value || "Unknown",
+    mbid: data?.mbid?.value || null,
+  };
+}
+
+async function tryQuery(lng, lat, radius) {
+  const sparql = `
+     #pragma hint.timeout 3000
+     SELECT ?city ?cityLabel ?country ?countryLabel ?mbid WHERE {
+       SERVICE wikibase:around {
+         ?city wdt:P625 ?coords .
+         bd:serviceParam wikibase:center "POINT(${lng} ${lat})"^^geo:wktLiteral;
+                        wikibase:radius "${radius}";
+                        wikibase:timeout 2000.
+       }
+
+       # Strict city definition with priority system
+       {
+         # First priority: Major global cities
+         VALUES ?majorCities { wd:Q60 wd:Q84 wd:Q90 }  # NYC, London, Paris
+         ?city wdt:P31 ?majorCities .
+       }
+       UNION
+       {
+         # Second priority: Official city designation
+         ?city wdt:P31 wd:Q515 .  # City proper
+         FILTER NOT EXISTS { ?city wdt:P31/wdt:P279* wd:Q3497294 }  # Exclude districts
+       }
+       UNION
+       {
+         # Third priority: Large urban settlements
+         ?city wdt:P31/wdt:P279* wd:Q486972 .  # Human settlement
+         ?city wdt:P1082 ?pop .  # Population
+         FILTER(?pop > 14000)  # Only larger populations
+         FILTER NOT EXISTS { ?city wdt:P31/wdt:P279* wd:Q3497294 }  # Exclude districts
+       }
+
+       # Country information
+       { ?city wdt:P17 ?country }
+       UNION
+       { ?city wdt:P131* ?country . ?country wdt:P31 wd:Q6256 }
+
+       ?city wdt:P982 ?mbid .
+
+       SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+     }
+     LIMIT 1
+   `;
+
+  const response = await fetch(
+    `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparql)}&format=json`,
+  );
+  return await response.json();
 }
 
 async function getArtistsFromArea(areaMBID) {
@@ -178,6 +200,10 @@ function getRandomArtists(artists, n) {
 }
 
 function clearScreen() {
+  if (map.getLayer("location-radius-outline"))
+    map.removeLayer("location-radius-outline");
+  if (map.getLayer("location-radius")) map.removeLayer("location-radius");
+  if (map.getSource("location-radius")) map.removeSource("location-radius");
   origin.innerHTML = "";
   origin.setAttribute("style", "display: none;");
   artistList.innerHTML = "";
@@ -185,11 +211,7 @@ function clearScreen() {
 }
 
 function drawCircle(radius, lng, lat) {
-  if (map.getLayer("location-radius-outline"))
-    map.removeLayer("location-radius-outline");
-  if (map.getLayer("location-radius")) map.removeLayer("location-radius");
-  if (map.getSource("location-radius")) map.removeSource("location-radius");
-
+  clearScreen();
   let center = [lng, lat];
   let options = { steps: 64, units: "kilometers" };
   let result = circle(center, radius, options);
