@@ -4,6 +4,8 @@ import "@maplibre/maplibre-gl-geocoder/dist/maplibre-gl-geocoder.css";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { circle } from "@turf/turf";
 
+let saveMapStateTimeout;
+
 const styles = {
   dark: "https://tiles.openfreemap.org/styles/dark",
   positron: "https://tiles.openfreemap.org/styles/positron",
@@ -31,12 +33,20 @@ const mbApi = new MusicBrainzApi({
 const map = new maplibregl.Map({
   container: "map",
   style: "https://tiles.openfreemap.org/styles/dark",
-  center: [-123.4, 47.9],
+  center: [0, 0],
   zoom: 6,
 });
 
+// Preserve style between sessions
+const savedStyle = localStorage.getItem("mapStyle");
+if (savedStyle && styles[savedStyle]) {
+  mapStyleSelector.value = savedStyle;
+  map.setStyle(styles[savedStyle]);
+}
+
 mapStyleSelector.addEventListener("change", (e) => {
   const selectedStyle = e.target.value.toLowerCase();
+  localStorage.setItem("mapStyle", selectedStyle);
   // 0.5s transition effect
   map.getCanvas().style.transition = "opacity 0.5s";
   map.getCanvas().style.opacity = "0";
@@ -52,12 +62,16 @@ map.on("error", (e) => {
   console.error("Map error: ", e.error);
 });
 
+map.on("load", loadMapState);
+map.on("move", saveMapState);
+map.on("zoom", saveMapState);
+
 map.on("mousemove", (e) => {
   try {
     document.getElementById("info").innerHTML =
       `${JSON.stringify(e.point)}<br />${JSON.stringify(e.lngLat.wrap())}`;
   } catch (error) {
-    console.error("Error getting coordinates under mouse cursor: ", error);
+    console.error("Error getting coordinates under mouse cursor:", error);
   }
 });
 
@@ -88,7 +102,7 @@ map.on("click", async (e) => {
       clearScreen();
     }
   } catch (error) {
-    console.error("Error handling click: ", error);
+    console.error("Error handling click:", error);
   }
 });
 
@@ -133,7 +147,7 @@ async function getLocationFromCoords(lng, lat) {
       mbid: result?.mbid?.value || null,
     };
   } catch (error) {
-    console.log("Error reverse geocoding area: ", error);
+    console.log("Error reverse geocoding area:", error);
     return null;
   }
 }
@@ -147,7 +161,7 @@ async function getArtistsFromArea(areaMBID) {
     const artists = response.artists;
     return artists;
   } catch (error) {
-    console.error("Error browsing artists from area: ", error);
+    console.error("Error browsing artists from area:", error);
     return null;
   }
 }
@@ -159,7 +173,7 @@ function getRandomArtists(artists, n) {
       .slice(0, n);
     return randomArtists;
   } catch (error) {
-    console.error("Couldn't get random artists", error);
+    console.error("Couldn't get random artists:", error);
   }
 }
 
@@ -198,4 +212,31 @@ function drawCircle(radius, lng, lat) {
     source: "location-radius",
     paint: { "line-color": "#0094ff", "line-width": 3 },
   });
+}
+
+function saveMapState() {
+  clearTimeout(saveMapStateTimeout);
+  saveMapStateTimeout = setTimeout(() => {
+    const center = map.getCenter();
+    localStorage.setItem(
+      "mapState",
+      JSON.stringify({
+        lng: center.lng,
+        lat: center.lat,
+        zoom: map.getZoom(),
+      }),
+    );
+  }, 500);
+}
+
+function loadMapState() {
+  const savedState = localStorage.getItem("mapState");
+  if (savedState) {
+    try {
+      const { lng, lat, zoom } = JSON.parse(savedState);
+      map.jumpTo({ center: [lng, lat], zoom });
+    } catch (error) {
+      console.error("Failed to load saved map state:", error);
+    }
+  }
 }
