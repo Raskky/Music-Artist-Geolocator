@@ -4,12 +4,23 @@ import "@maplibre/maplibre-gl-geocoder/dist/maplibre-gl-geocoder.css";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { circle } from "@turf/turf";
 
+const styles = {
+  dark: "https://tiles.openfreemap.org/styles/dark",
+  positron: "https://tiles.openfreemap.org/styles/positron",
+  bright: "https://tiles.openfreemap.org/styles/bright",
+  liberty: "https://tiles.openfreemap.org/styles/liberty",
+};
+
 const origin = document.getElementById("origin");
 const artistList = document.getElementById("artists");
 
-const styles = {
-  dark: "https://tiles.openfreemap.org/styles/dark",
-};
+const mapStyleSelector = document.getElementById("map-style-selector");
+for (let style in styles) {
+  const option = document.createElement("option");
+  option.value = style;
+  option.innerHTML = style.charAt(0).toUpperCase() + style.slice(1);
+  mapStyleSelector.appendChild(option);
+}
 
 const mbApi = new MusicBrainzApi({
   appName: "artist-map",
@@ -22,6 +33,17 @@ const map = new maplibregl.Map({
   style: "https://tiles.openfreemap.org/styles/dark", // style URL
   center: [-123.4, 47.9], // starting position [lng, lat]
   zoom: 6, // starting zoom
+});
+
+mapStyleSelector.addEventListener("change", (e) => {
+  console.log(e.target.value);
+  const selectedStyle = e.target.value.toLowerCase();
+  console.log(selectedStyle);
+  map.setStyle(styles[selectedStyle]);
+});
+
+map.on("error", (e) => {
+  console.error("Map error: ", e.error);
 });
 
 map.on("mousemove", (e) => {

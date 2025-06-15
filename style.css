@@ -25,6 +25,7 @@ ul {
     top: 10px;
     left: 15%;
     transform: translate(-50%);
+    margin-left: 20px;
     width: 20%;
     padding: 10px;
     border: none;
@@ -92,4 +93,11 @@ ul {
     text-align: center;
     text-wrap: wrap;
     text-overflow: ellipsis;
+}
+
+#map-style-switcher {
+    display: block;
+    position: absolute;
+    margin-left: 10px;
+    margin-top: 25px;
 }
