@@ -29,17 +29,23 @@ const mbApi = new MusicBrainzApi({
 });
 
 const map = new maplibregl.Map({
-  container: "map", // container id
-  style: "https://tiles.openfreemap.org/styles/dark", // style URL
-  center: [-123.4, 47.9], // starting position [lng, lat]
-  zoom: 6, // starting zoom
+  container: "map",
+  style: "https://tiles.openfreemap.org/styles/dark",
+  center: [-123.4, 47.9],
+  zoom: 6,
 });
 
 mapStyleSelector.addEventListener("change", (e) => {
-  console.log(e.target.value);
   const selectedStyle = e.target.value.toLowerCase();
-  console.log(selectedStyle);
-  map.setStyle(styles[selectedStyle]);
+  // 0.5s transition effect
+  map.getCanvas().style.transition = "opacity 0.5s";
+  map.getCanvas().style.opacity = "0";
+  setTimeout(() => {
+    map.setStyle(styles[selectedStyle]);
+    map.once("styledata", () => {
+      map.getCanvas().style.opacity = "1";
+    });
+  }, 500);
 });
 
 map.on("error", (e) => {
