@@ -103,6 +103,12 @@ map.on("click", async (e) => {
         ul.innerHTML = a.name;
         artistList.appendChild(ul);
       });
+      const popup = new maplibregl.Popup({
+        closeOnClick: false,
+      })
+        .setLngLat(e.lngLat)
+        .setHTML(artistList.innerHTML)
+        .addTo(map);
     } else {
       clearScreen();
     }
