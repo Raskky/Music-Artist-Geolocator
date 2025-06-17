@@ -3,6 +3,7 @@ import { MusicBrainzApi } from "musicbrainz-api";
 import "@maplibre/maplibre-gl-geocoder/dist/maplibre-gl-geocoder.css";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { circle } from "@turf/turf";
+import MaplibreGeocoder from "@maplibre/maplibre-gl-geocoder";
 
 let saveMapStateTimeout;
 
@@ -14,7 +15,7 @@ const styles = {
 };
 
 const origin = document.getElementById("origin");
-const artistList = document.getElementById("artists");
+const artistList = document.getElementById("artist-list");
 
 const mapStyleSelector = document.getElementById("map-style-selector");
 for (let style in styles) {
@@ -43,6 +44,9 @@ if (savedStyle && styles[savedStyle]) {
   mapStyleSelector.value = savedStyle;
   map.setStyle(styles[savedStyle]);
 }
+
+const marker = new maplibregl.Marker();
+const popup = new maplibregl.Popup({ closeOnClick: false });
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") clearScreen();
@@ -82,9 +86,10 @@ map.on("mousemove", (e) => {
 map.on("click", async (e) => {
   try {
     console.log(map.getZoom());
-    let radius = 1;
     clearScreen();
-    drawCircle(radius, e.lngLat.lng, e.lngLat.lat);
+    marker.setLngLat(e.lngLat).addTo(map);
+    //let radius = 1;
+    //drawCircle(radius, e.lngLat.lng, e.lngLat.lat);
     const location = await getLocationFromCoords(e.lngLat.lng, e.lngLat.lat);
     console.log(location);
     const artists = await getArtistsFromArea(location.mbid);
@@ -94,6 +99,7 @@ map.on("click", async (e) => {
       origin.innerHTML = `${location.city}, ${location.country}`;
       origin.setAttribute("style", "display: block;");
       const p = document.createElement("p");
+      p.id = "artist-list-info";
       artistList.setAttribute("style", "display: block;");
       p.innerHTML = `<b>10 Artists from ${location.city}, ${location.country}</b>`;
       artistList.appendChild(p);
@@ -103,12 +109,15 @@ map.on("click", async (e) => {
         ul.innerHTML = a.name;
         artistList.appendChild(ul);
       });
-      const popup = new maplibregl.Popup({
-        closeOnClick: false,
-      })
+      popup
         .setLngLat(e.lngLat)
-        .setHTML(artistList.innerHTML)
+        .setMaxWidth("none")
+        .setOffset(35)
+        .setHTML(document.getElementById("artists").innerHTML)
         .addTo(map);
+      popup.on("close", () => {
+        clearScreen();
+      });
     } else {
       clearScreen();
     }
@@ -206,6 +215,9 @@ function getRandomArtists(artists, n) {
 }
 
 function clearScreen() {
+  marker.remove();
+  popup.remove();
+  if (map.getLayer("maplibrelg-marker")) map.remove("maplibregl-marker");
   if (map.getLayer("location-radius-outline"))
     map.removeLayer("location-radius-outline");
   if (map.getLayer("location-radius")) map.removeLayer("location-radius");

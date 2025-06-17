@@ -53,21 +53,38 @@ ul {
     background: rgba(255, 255, 255, 0.8);
 }
 
-#artists {
-    display: none;
+#artist-list {
+    height: 220px;
+    padding-bottom: 10px;
+    overflow-x: hidden;
+    overflow-y: hidden;
+}
+
+#artist-list:hover {
+    overflow-y: auto;
+}
+
+.maplibregl-popup-content {
     position: absolute;
+    /*
     right: 30px;
     bottom: 30px;
-    width: 15%;
     height: 30%;
     overflow: auto;
-    border-radius: 8px;
     margin-top: 0;
+    */
+    max-height: 240px;
+    min-width: 240px;
+    max-width: 340px;
     padding: 10px;
+    border-radius: 8px;
     text-align: center;
-    text-wrap: wrap;
     font-size: 16px;
     background: rgb(255, 255, 255, 0.8);
+}
+
+#artist-list-info {
+    text-wrap: wrap;
 }
 
 #geocoder-container {
