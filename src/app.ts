@@ -1,24 +1,57 @@
 import maplibregl from "maplibre-gl";
 import { MusicBrainzApi } from "musicbrainz-api";
-import "@maplibre/maplibre-gl-geocoder/dist/maplibre-gl-geocoder.css";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { circle } from "@turf/turf";
-import MaplibreGeocoder from "@maplibre/maplibre-gl-geocoder";
 
-let saveMapStateTimeout;
+interface Styles {
+  [key: string]: string;
+  dark: string;
+  positron: string;
+  bright: string;
+  liberty: string;
+}
 
-const styles = {
+// why use [key: string] in Styles but not in LocationData?
+interface LocationData {
+  city: string;
+  country: string;
+  mbid: string | null;
+}
+
+interface Artist {
+  name: string;
+  [key: string]: any; // Additional properties from MusicBrainzApi
+}
+
+interface MapState {
+  lng: number;
+  lat: number;
+  zoom: number;
+}
+
+interface WikidataResponse {
+  results?: {
+    bindings: Array<{
+      cityLabel?: { value: string };
+      countryLabel?: { value: string };
+      mbid?: { value: string };
+    }>;
+  };
+}
+
+const styles: Styles = {
   dark: "https://tiles.openfreemap.org/styles/dark",
   positron: "https://tiles.openfreemap.org/styles/positron",
   bright: "https://tiles.openfreemap.org/styles/bright",
   liberty: "https://tiles.openfreemap.org/styles/liberty",
 };
 
-const origin = document.getElementById("origin");
-const artistList = document.getElementById("artist-list");
+const origin = document.getElementById("origin") as HTMLElement;
+const artistList = document.getElementById("artist-list") as HTMLElement;
+const mapStyleSelector = document.getElementById(
+  "map-style-selector",
+) as HTMLSelectElement;
 
-const mapStyleSelector = document.getElementById("map-style-selector");
-for (let style in styles) {
+for (const style in styles) {
   const option = document.createElement("option");
   option.value = style;
   option.innerHTML = style.charAt(0).toUpperCase() + style.slice(1);
@@ -38,35 +71,39 @@ const map = new maplibregl.Map({
   zoom: 6,
 });
 
-// Preserve style between sessions
-const savedStyle = localStorage.getItem("mapStyle");
-if (savedStyle && styles[savedStyle]) {
-  mapStyleSelector.value = savedStyle;
-  map.setStyle(styles[savedStyle]);
-}
-
 const marker = new maplibregl.Marker();
-const popup = new maplibregl.Popup({ closeOnClick: false });
+const popup = new maplibregl.Popup({
+  closeOnClick: false,
+  focusAfterOpen: true,
+});
+
+let saveMapStateTimeout: NodeJS.Timeout;
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") clearScreen();
 });
 
-mapStyleSelector.addEventListener("change", (e) => {
-  const selectedStyle = e.target.value.toLowerCase();
-  localStorage.setItem("mapStyle", selectedStyle);
+mapStyleSelector.addEventListener("change", (e: Event) => {
+  const target = e.target as HTMLSelectElement;
+  const selectedStyle = target.value.toLowerCase();
+
+  if (styles[selectedStyle]) {
+    localStorage.setItem("mapStyle", selectedStyle);
+  }
   // 0.5s transition effect
-  map.getCanvas().style.transition = "opacity 0.5s";
-  map.getCanvas().style.opacity = "0";
+  const canvas = map.getCanvas();
+  canvas.style.transition = "opacity 0.5s";
+  canvas.style.opacity = "0";
+
   setTimeout(() => {
     map.setStyle(styles[selectedStyle]);
     map.once("styledata", () => {
-      map.getCanvas().style.opacity = "1";
+      canvas.style.opacity = "1";
     });
   }, 500);
 });
 
-map.on("error", (e) => {
+map.on("error", (e: { error: Error }) => {
   console.error("Map error: ", e.error);
 });
 
@@ -74,50 +111,61 @@ map.on("load", loadMapState);
 map.on("move", saveMapState);
 map.on("zoom", saveMapState);
 
-map.on("mousemove", (e) => {
+map.on("mousemove", (e: maplibregl.MapMouseEvent) => {
   try {
-    document.getElementById("info").innerHTML =
-      `${JSON.stringify(e.point)}<br />${JSON.stringify(e.lngLat.wrap())}`;
+    const infoElement = document.getElementById("info");
+    if (infoElement) {
+      infoElement.innerHTML = `${JSON.stringify(e.point)}<br />${JSON.stringify(e.lngLat.wrap())}`;
+    }
   } catch (error) {
     console.error("Error getting coordinates under mouse cursor:", error);
   }
 });
 
-map.on("click", async (e) => {
+map.on("click", async (e: maplibregl.MapMouseEvent) => {
   try {
     console.log(map.getZoom());
     clearScreen();
     marker.setLngLat(e.lngLat).addTo(map);
-    //let radius = 1;
-    //drawCircle(radius, e.lngLat.lng, e.lngLat.lat);
     const location = await getLocationFromCoords(e.lngLat.lng, e.lngLat.lat);
     console.log(location);
-    const artists = await getArtistsFromArea(location.mbid);
-    const randomArtists = await getRandomArtists(artists, 10);
 
-    if (randomArtists && randomArtists.length > 0) {
-      origin.innerHTML = `${location.city}, ${location.country}`;
-      origin.setAttribute("style", "display: block;");
-      const p = document.createElement("p");
-      p.id = "artist-list-info";
-      artistList.setAttribute("style", "display: block;");
-      p.innerHTML = `<b>10 Artists from ${location.city}, ${location.country}</b>`;
-      artistList.appendChild(p);
+    if (location.mbid) {
+      const artists = await getArtistsFromArea(location.mbid);
+      const randomArtists = artists ? getRandomArtists(artists, 10) : null;
 
-      randomArtists.forEach((a) => {
-        const ul = document.createElement("ul");
-        ul.innerHTML = a.name;
-        artistList.appendChild(ul);
-      });
-      popup
-        .setLngLat(e.lngLat)
-        .setMaxWidth("none")
-        .setOffset(35)
-        .setHTML(document.getElementById("artists").innerHTML)
-        .addTo(map);
-      popup.on("close", () => {
+      if (randomArtists && randomArtists.length > 0) {
+        origin.innerHTML = `${location.city}, ${location.country}`;
+        origin.style.display = "block";
+
+        const p = document.createElement("p");
+        p.id = "artist-list-info";
+        artistList.style.display = "block";
+        p.innerHTML = `<b>10 Artists from ${location.city}, ${location.country}</b>`;
+        artistList.appendChild(p);
+
+        randomArtists.forEach((a: Artist) => {
+          const ul = document.createElement("ul");
+          ul.innerHTML = a.name;
+          artistList.appendChild(ul);
+        });
+
+        const artistElement = document.getElementById("artists");
+        if (artistElement) {
+          popup
+            .setLngLat(e.lngLat)
+            .setMaxWidth("none")
+            .setOffset(40)
+            .setHTML(artistElement.innerHTML)
+            .addTo(map);
+
+          popup.on("close", () => {
+            clearScreen();
+          });
+        }
+      } else {
         clearScreen();
-      });
+      }
     } else {
       clearScreen();
     }
@@ -126,9 +174,19 @@ map.on("click", async (e) => {
   }
 });
 
-async function getLocationFromCoords(lng, lat) {
+// Preserve style between sessions
+const savedStyle = localStorage.getItem("mapStyle");
+if (savedStyle && styles[savedStyle]) {
+  mapStyleSelector.value = savedStyle;
+  map.setStyle(styles[savedStyle]);
+}
+
+async function getLocationFromCoords(
+  lng: number,
+  lat: number,
+): Promise<LocationData> {
   let result = await tryQuery(lng, lat, 3);
-  if (!result || result.results.bindingslength === 0) {
+  if (!result || !result.results || result.results.bindings.length === 0) {
     result = await tryQuery(lng, lat, 50);
   }
   const data = result?.results?.bindings[0];
@@ -139,7 +197,11 @@ async function getLocationFromCoords(lng, lat) {
   };
 }
 
-async function tryQuery(lng, lat, radius) {
+async function tryQuery(
+  lng: number,
+  lat: number,
+  radius: number,
+): Promise<WikidataResponse> {
   const sparql = `
      #pragma hint.timeout 3000
      SELECT ?city ?cityLabel ?country ?countryLabel ?mbid WHERE {
@@ -189,72 +251,45 @@ async function tryQuery(lng, lat, radius) {
   return await response.json();
 }
 
-async function getArtistsFromArea(areaMBID) {
+async function getArtistsFromArea(areaMBID: string): Promise<Artist[] | null> {
   try {
     const response = await mbApi.browse("artist", {
       area: areaMBID,
       limit: 100,
     });
-    const artists = response.artists;
-    return artists;
+    return response.artists;
   } catch (error) {
     console.error("Error browsing artists from area:", error);
     return null;
   }
 }
 
-function getRandomArtists(artists, n) {
+function getRandomArtists(artists: Artist[], n: number) {
   try {
-    const randomArtists = artists
-      .sort(() => Math.random() - Math.random())
-      .slice(0, n);
-    return randomArtists;
+    return [...artists].sort(() => Math.random() - 0.5).slice(0, n);
   } catch (error) {
     console.error("Couldn't get random artists:", error);
+    return [];
   }
 }
 
-function clearScreen() {
+function clearScreen(): void {
   marker.remove();
   popup.remove();
-  if (map.getLayer("maplibrelg-marker")) map.remove("maplibregl-marker");
+
+  if (map.getLayer("maplibrelg-marker")) map.removeLayer("maplibregl-marker");
   if (map.getLayer("location-radius-outline"))
     map.removeLayer("location-radius-outline");
   if (map.getLayer("location-radius")) map.removeLayer("location-radius");
   if (map.getSource("location-radius")) map.removeSource("location-radius");
+
   origin.innerHTML = "";
-  origin.setAttribute("style", "display: none;");
+  origin.style.display = "none";
   artistList.innerHTML = "";
-  artistList.setAttribute("style", "display: none;");
+  artistList.style.display = "none";
 }
 
-function drawCircle(radius, lng, lat) {
-  clearScreen();
-  let center = [lng, lat];
-  let options = { steps: 64, units: "kilometers" };
-  let result = circle(center, radius, options);
-
-  // Add the circle as a GeoJSON source
-  map.addSource("location-radius", { type: "geojson", data: result });
-
-  // Add a fill layer with some transparency
-  map.addLayer({
-    id: "location-radius",
-    type: "fill",
-    source: "location-radius",
-    paint: { "fill-color": "#8CCFFF", "fill-opacity": 0.5 },
-  });
-
-  // Add a line layer to draw the circle outline
-  map.addLayer({
-    id: "location-radius-outline",
-    type: "line",
-    source: "location-radius",
-    paint: { "line-color": "#0094ff", "line-width": 3 },
-  });
-}
-
-function saveMapState() {
+function saveMapState(): void {
   clearTimeout(saveMapStateTimeout);
   saveMapStateTimeout = setTimeout(() => {
     const center = map.getCenter();
@@ -269,11 +304,11 @@ function saveMapState() {
   }, 500);
 }
 
-function loadMapState() {
+function loadMapState(): void {
   const savedState = localStorage.getItem("mapState");
   if (savedState) {
     try {
-      const { lng, lat, zoom } = JSON.parse(savedState);
+      const { lng, lat, zoom } = JSON.parse(savedState) as MapState;
       map.jumpTo({ center: [lng, lat], zoom });
     } catch (error) {
       console.error("Failed to load saved map state:", error);

@@ -11,6 +11,8 @@
   "dependencies": {
     "@maplibre/maplibre-gl-geocoder": "^1.8.0",
     "@turf/turf": "^7.2.0",
+    "@types/maplibre-gl": "^1.14.0",
+    "@types/node": "^24.0.3",
     "@watergis/mapbox.photon": "^0.0.5",
     "live-server": "^1.2.2",
     "maplibre-gl": "^5.5.0",
