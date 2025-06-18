@@ -10,7 +10,6 @@ interface Styles {
   liberty: string;
 }
 
-// why use [key: string] in Styles but not in LocationData?
 interface LocationData {
   city: string;
   country: string;
@@ -19,7 +18,7 @@ interface LocationData {
 
 interface Artist {
   name: string;
-  [key: string]: any; // Additional properties from MusicBrainzApi
+  [key: string]: any; // For additional properties from MusicBrainzApi
 }
 
 interface MapState {
