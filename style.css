@@ -1,4 +1,5 @@
 body {
+    font-family: "Poppins", sans-serif;
     margin: 0;
     padding: 0;
 }
@@ -20,23 +21,31 @@ ul {
 }
 
 #map-style-selector {
-    height: 50px;
-    align-items: center;
-    text-align: center;
-}
-
-#map-style-switcher {
-    display: block;
     position: absolute;
-    align-items: center;
     top: 20px;
     right: 20px;
+    z-index: 1;
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 12px;
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: 2px solid #4a5568;
+    background-color: rgba(255, 255, 255, 0.9);
+    color: #2d3748;
+    font-family: "Poppins", sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    appearance: none;
 }
+
 #origin {
     display: none;
     position: absolute;
+    z-index: 1;
     overflow-x: none;
-    top: 10px;
+    top: 20px;
     left: 50%;
     transform: translate(-50%);
     width: 10%;
@@ -47,12 +56,14 @@ ul {
     padding: 10px;
     font-size: 18px;
     border-radius: 12px;
-    background: rgba(240, 240, 240, 0.8);
+    border: 2px solid #4a5568;
+    background: rgba(250, 250, 250, 0.8);
 }
 
 #artist-list {
     height: 220px;
     padding: 20px;
+    padding-top: 0px;
     padding-bottom: 10px;
     overflow-x: hidden;
     overflow-y: hidden;
@@ -67,39 +78,25 @@ ul {
     max-height: 240px;
     min-width: 240px;
     max-width: 400px;
-    border-radius: 8px;
+    border-radius: 12px;
     text-align: center;
     font-size: 16px;
-    background: rgb(240, 240, 240, 0.8);
+    border: 2px solid #4a5568;
+    background: rgb(250, 250, 250, 0.8);
+}
+
+.maplibregl-popup-close-button {
+    font-size: 20px;
+    font-weight: bold;
+    margin-right: 4px;
+}
+
+.maplibregl-popup-tip {
+    display: none;
 }
 
 #artist-list-info {
     padding-top: 0;
     margin-top: 0;
     text-wrap: wrap;
-}
-
-#geocoder-container {
-    display: flex;
-    text-align: center;
-    align-items: center;
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    padding: 10px;
-}
-
-.maplibregl-ctrl-geocoder--result-address {
-    text-align: center;
-    text-wrap: wrap;
-    text-overflow: ellipsis;
-}
-
-#select-search-options {
-    background: whitesmoke;
-    border-radius: 8px;
-    margin: 2px;
-    padding: 8px;
-    font-size: 14px;
-    font-weight: bold;
 }

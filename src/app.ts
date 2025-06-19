@@ -111,9 +111,9 @@ map.on("move", saveMapState);
 map.on("zoom", saveMapState);
 
 map.on("click", async (e: maplibregl.MapMouseEvent) => {
+  clearScreen();
   try {
     console.log(map.getZoom());
-    clearScreen();
     marker.setLngLat(e.lngLat).addTo(map);
     const location = await getLocationFromCoords(e.lngLat.lng, e.lngLat.lat);
 
