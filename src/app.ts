@@ -10,7 +10,6 @@ interface Styles {
   liberty: string;
 }
 
-// why use [key: string] in Styles but not in LocationData?
 interface LocationData {
   city: string;
   country: string;
@@ -19,7 +18,7 @@ interface LocationData {
 
 interface Artist {
   name: string;
-  [key: string]: any; // Additional properties from MusicBrainzApi
+  [key: string]: any; // For additional properties from MusicBrainzApi
 }
 
 interface MapState {
@@ -111,24 +110,12 @@ map.on("load", loadMapState);
 map.on("move", saveMapState);
 map.on("zoom", saveMapState);
 
-map.on("mousemove", (e: maplibregl.MapMouseEvent) => {
-  try {
-    const infoElement = document.getElementById("info");
-    if (infoElement) {
-      infoElement.innerHTML = `${JSON.stringify(e.point)}<br />${JSON.stringify(e.lngLat.wrap())}`;
-    }
-  } catch (error) {
-    console.error("Error getting coordinates under mouse cursor:", error);
-  }
-});
-
 map.on("click", async (e: maplibregl.MapMouseEvent) => {
   try {
     console.log(map.getZoom());
     clearScreen();
     marker.setLngLat(e.lngLat).addTo(map);
     const location = await getLocationFromCoords(e.lngLat.lng, e.lngLat.lat);
-    console.log(location);
 
     if (location.mbid) {
       const artists = await getArtistsFromArea(location.mbid);
@@ -155,7 +142,7 @@ map.on("click", async (e: maplibregl.MapMouseEvent) => {
           popup
             .setLngLat(e.lngLat)
             .setMaxWidth("none")
-            .setOffset(40)
+            .setOffset(45)
             .setHTML(artistElement.innerHTML)
             .addTo(map);
 
@@ -189,6 +176,7 @@ async function getLocationFromCoords(
   if (!result || !result.results || result.results.bindings.length === 0) {
     result = await tryQuery(lng, lat, 50);
   }
+  console.log(result);
   const data = result?.results?.bindings[0];
   return {
     city: data?.cityLabel?.value || "Unknown",
@@ -203,47 +191,48 @@ async function tryQuery(
   radius: number,
 ): Promise<WikidataResponse> {
   const sparql = `
-     #pragma hint.timeout 3000
-     SELECT ?city ?cityLabel ?country ?countryLabel ?mbid WHERE {
-       SERVICE wikibase:around {
-         ?city wdt:P625 ?coords .
-         bd:serviceParam wikibase:center "POINT(${lng} ${lat})"^^geo:wktLiteral;
-                        wikibase:radius "${radius}";
-                        wikibase:timeout 2000.
-       }
+    #pragma hint.timeout 3000
+         SELECT ?city ?cityLabel ?country ?countryLabel ?mbid WHERE {
+           SERVICE wikibase:around {
+             ?city wdt:P625 ?coords .
+             bd:serviceParam wikibase:center "POINT(${lng} ${lat})"^^geo:wktLiteral;
+                            wikibase:radius "${radius}";
+                            wikibase:timeout 2000.
+           }
 
-       # Strict city definition with priority system
-       {
-         # First priority: Major global cities
-         VALUES ?majorCities { wd:Q60 wd:Q84 wd:Q90 }  # NYC, London, Paris
-         ?city wdt:P31 ?majorCities .
-       }
-       UNION
-       {
-         # Second priority: Official city designation
-         ?city wdt:P31 wd:Q515 .  # City proper
-         FILTER NOT EXISTS { ?city wdt:P31/wdt:P279* wd:Q3497294 }  # Exclude districts
-       }
-       UNION
-       {
-         # Third priority: Large urban settlements
-         ?city wdt:P31/wdt:P279* wd:Q486972 .  # Human settlement
-         ?city wdt:P1082 ?pop .  # Population
-         FILTER(?pop > 14000)  # Only larger populations
-         FILTER NOT EXISTS { ?city wdt:P31/wdt:P279* wd:Q3497294 }  # Exclude districts
-       }
+           # Strict city definition with priority system
+           {
+             # First priority: Major global cities
+             VALUES ?majorCities { wd:Q60 wd:Q84 wd:Q90 }  # NYC, London, Paris
+             ?city wdt:P31 ?majorCities .
+             FILTER NOT EXISTS { ?city wdt:P31/wdt:P279* wd:Q3497294 }  # Exclude districts
+             }
+           UNION
+           {
+             # Second priority: Official city designation
+             ?city wdt:P31 wd:Q515 .  # City proper
+             FILTER NOT EXISTS { ?city wdt:P31/wdt:P279* wd:Q3497294 }  # Exclude districts
+           }
+           UNION
+           {
+             # Third priority: Large urban settlements
+             ?city wdt:P31/wdt:P279* wd:Q486972 .  # Human settlement
+             ?city wdt:P1082 ?pop .  # Population
+             FILTER(?pop > 14000)  # Only larger populations
+             FILTER NOT EXISTS { ?city wdt:P31/wdt:P279* wd:Q3497294 }  # Exclude districts
+           }
 
-       # Country information
-       { ?city wdt:P17 ?country }
-       UNION
-       { ?city wdt:P131* ?country . ?country wdt:P31 wd:Q6256 }
+           # Country information
+           { ?city wdt:P17 ?country }
+           UNION
+           { ?city wdt:P131* ?country . ?country wdt:P31 wd:Q6256 }
 
-       ?city wdt:P982 ?mbid .
+           ?city wdt:P982 ?mbid .
 
-       SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-     }
-     LIMIT 1
-   `;
+           SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+         }
+         LIMIT 1
+        `;
 
   const response = await fetch(
     `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparql)}&format=json`,
