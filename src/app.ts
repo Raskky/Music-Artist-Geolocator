@@ -1,7 +1,6 @@
 import maplibregl, { LngLatLike } from "maplibre-gl";
 import { MusicBrainzApi } from "musicbrainz-api";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { coordAll } from "@turf/turf";
 
 interface Styles {
 	[key: string]: string;
@@ -31,7 +30,7 @@ interface WikidataResponse {
 
 interface Artist {
 	name: string;
-	[key: string]: any; // For additional properties from MusicBrainzApi
+	[key: string]: any;
 }
 
 interface MapState {
@@ -49,6 +48,9 @@ const styles: Styles = {
 
 const origin = document.getElementById("origin") as HTMLElement;
 const artistList = document.getElementById("artist-list") as HTMLElement;
+const artistsRange = document.getElementById("artists-range") as HTMLInputElement;
+const artistsRangeValue = document.getElementById("artists-range-value") as HTMLElement;
+artistsRangeValue.innerText = artistsRange.value;
 const mapStyleSelector = document.getElementById(
 	"map-style-selector",
 ) as HTMLSelectElement;
@@ -84,6 +86,10 @@ let saveMapStateTimeout: NodeJS.Timeout;
 document.addEventListener("keydown", (e) => {
 	if (e.key === "Escape") clearScreen();
 });
+
+artistsRange.oninput = function() {
+	artistsRangeValue.innerText = artistsRange.value;
+}
 
 mapStyleSelector.addEventListener("change", (e: Event) => {
 	const target = e.target as HTMLSelectElement;
@@ -121,16 +127,16 @@ map.on("click", async (e: maplibregl.MapMouseEvent) => {
 		marker.setLngLat(location.coordinates)
 		if (location.mbid) {
 			const artists = await getArtistsFromArea(location.mbid);
-			const randomArtists = artists ? getRandomArtists(artists, 10) : null;
-
+			const n = parseInt(artistsRangeValue.innerText);
+			const randomArtists = artists ? getRandomArtists(artists, n) : null;
 			if (randomArtists && randomArtists.length > 0) {
 				origin.innerHTML = `${location.city}, ${location.country}`;
 				origin.style.display = "block";
+				artistList.style.display = "block";
 
 				const p = document.createElement("p");
-				p.id = "artist-list-info";
-				artistList.style.display = "block";
-				p.innerHTML = `<b>10 Artists from ${location.city}, ${location.country}</b>`;
+				p.id = "artist-info";
+				p.innerHTML = `<b>${n} Artists from ${location.city}, ${location.country}</b>`;
 				artistList.appendChild(p);
 
 				randomArtists.forEach((a: Artist) => {
@@ -139,13 +145,13 @@ map.on("click", async (e: maplibregl.MapMouseEvent) => {
 					artistList.appendChild(ul);
 				});
 
-				const artistElement = document.getElementById("artists")
-				if (artistElement) {
+				const artistsContainer = document.getElementById("artists-container")
+				if (artistsContainer) {
 					popup
 						.setLngLat(location.coordinates)
 						.setMaxWidth("none")
 						.setOffset(45)
-						.setHTML(artistElement.innerHTML)
+						.setHTML(artistsContainer.innerHTML)
 						.addTo(map);
 
 					popup.on("close", () => {
@@ -185,8 +191,8 @@ async function getLocationFromCoords(
 		country: data?.countryLabel?.value || "Unknown",
 		mbid: data?.mbid?.value || null,
 		coordinates: {
-			lng: coordsMatch ? parseFloat(coordsMatch[0]) : null,
-			lat: coordsMatch ? parseFloat(coordsMatch[1]) : null,
+			lng: coordsMatch ? parseFloat(coordsMatch[0]) : lng,
+			lat: coordsMatch ? parseFloat(coordsMatch[1]) : lat,
 		},
 	};
 }
